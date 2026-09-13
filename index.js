@@ -1,8 +1,11 @@
+import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
+import mongoose from 'mongoose'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import Person from './models/person.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -18,85 +21,78 @@ app.use(
   )
 )
 
-let persons = [
-  {
-    id: 1,
-    name: 'Arto Hellas',
-    number: '040-123456'
-  },
-  {
-    id: 2,
-    name: 'Ada Lovelace',
-    number: '39-44-5323523'
-  },
-  {
-    id: 3,
-    name: 'Dan Abramov',
-    number: '12-43-234345'
-  },
-  {
-    id: 4,
-    name: 'Mary Poppendieck',
-    number: '39-23-6423122'
-  }
-]
+const MONGO_URI = process.env.MONGODB_URI
 
-app.get('/api/persons', (req, res) => {
-  res.json(persons)
+if (!MONGO_URI) {
+  console.log('error: MONGODB_URI not set')
+  process.exit(1)
+}
+
+mongoose.set('strictQuery', false)
+mongoose
+  .connect(MONGO_URI)
+  .then(() => console.log('connected to MongoDB'))
+  .catch((error) => console.log('error connecting to MongoDB:', error.message))
+
+app.get('/api/persons', async (request, response) => {
+  const persons = await Person.find({})
+  response.json(persons)
 })
 
-app.get('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id)
-  const person = persons.find((p) => p.id === id)
+app.get('/api/persons/:id', async (request, response) => {
+  const person = await Person.findById(request.params.id)
 
   if (person) {
-    res.json(person)
+    response.json(person)
   } else {
-    res.status(404).json({ error: 'person not found' })
+    response.status(404).json({ error: 'person not found' })
   }
 })
 
-app.get('/info', (req, res) => {
+app.get('/info', async (request, response) => {
+  const count = await Person.countDocuments({})
   const now = new Date()
-  res.send(
-    `<p>Phonebook has info for ${persons.length} people</p>` +
+  response.send(
+    `<p>Phonebook has info for ${count} people</p>` +
       `<p>${now.toString()}</p>`
   )
 })
 
-app.delete('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id)
-  const exists = persons.some((p) => p.id === id)
-
-  if (exists) {
-    persons = persons.filter((p) => p.id !== id)
-    res.status(204).end()
-  } else {
-    res.status(404).json({ error: 'person not found' })
-  }
+app.delete('/api/persons/:id', async (request, response) => {
+  await Person.findByIdAndDelete(request.params.id)
+  response.status(204).end()
 })
 
-const generateId = () => Math.floor(Math.random() * 1000000)
-
-app.post('/api/persons', (req, res) => {
-  const body = req.body
+app.post('/api/persons', async (request, response) => {
+  const body = request.body
 
   if (!body.name || !body.number) {
-    return res.status(400).json({ error: 'name or number missing' })
+    return response.status(400).json({ error: 'name or number missing' })
   }
 
-  if (persons.some((p) => p.name === body.name)) {
-    return res.status(400).json({ error: 'name must be unique' })
-  }
-
-  const person = {
-    id: generateId(),
+  const person = new Person({
     name: body.name,
     number: body.number
-  }
+  })
 
-  persons = persons.concat(person)
-  res.status(201).json(person)
+  const savedPerson = await person.save()
+  response.status(201).json(savedPerson)
+})
+
+app.put('/api/persons/:id', async (request, response) => {
+  const { name, number } = request.body
+
+  const updatedPerson = await Person.findByIdAndUpdate(
+    request.params.id,
+    { name, number },
+    { new: true, runValidators: true, context: 'query' }
+  )
+
+  if (updatedPerson) {
+    response.json(updatedPerson)
+  } else {
+    response.status(404).json({ error: 'person not found' })
+  }
 })
 
 const unknownEndpoint = (request, response) => {
@@ -105,6 +101,20 @@ const unknownEndpoint = (request, response) => {
 
 app.use(express.static(path.join(__dirname, 'frontend/dist')))
 app.use(unknownEndpoint)
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message)
+
+  if (error.name === 'CastError') {
+    return response.status(400).send({ error: 'malformatted id' })
+  } else if (error.name === 'ValidationError') {
+    return response.status(400).json({ error: error.message })
+  }
+
+  next(error)
+}
+
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 
