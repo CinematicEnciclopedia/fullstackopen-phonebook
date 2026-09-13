@@ -1,6 +1,10 @@
 import express from 'express'
 import cors from 'cors'
 import morgan from 'morgan'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const app = express()
 
@@ -99,6 +103,7 @@ const unknownEndpoint = (request, response) => {
   response.status(404).send({ error: 'unknown endpoint' })
 }
 
+app.use(express.static(path.join(__dirname, 'frontend/dist')))
 app.use(unknownEndpoint)
 
 const PORT = process.env.PORT || 3001
