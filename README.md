@@ -26,4 +26,4 @@ El frontend (React) viu a `frontend/`; en desenvolupament es connecta al backend
 
 ## Aplicació en línia
 
-(Enllaç a l'aplicació desplegada — s'omple quan es desplega a Render)
+Backend desplegat a Render: <https://phonebook-backend-4m09.onrender.com>
