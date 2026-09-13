@@ -111,7 +111,7 @@ const errorHandler = (error, _request, response, next) => {
     return response.status(400).json({ error: error.message })
   }
 
-  next(error)
+  response.status(error.status || 500).json({ error: error.message })
 }
 
 app.use(errorHandler)
