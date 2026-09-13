@@ -43,13 +43,18 @@ const App = () => {
             })
             setTimeout(() => setMessage(null), 5000)
           })
-          .catch(() => {
+          .catch((error) => {
+            const validationError = error.response?.data?.error
             setMessage({
-              text: `Information of ${newName} has already been removed from server`,
+              text:
+                validationError ||
+                `Information of ${newName} has already been removed from server`,
               type: 'error'
             })
             setTimeout(() => setMessage(null), 5000)
-            setPersons(persons.filter((p) => p.id !== existing.id))
+            if (error.response?.status !== 400) {
+              setPersons(persons.filter((p) => p.id !== existing.id))
+            }
           })
       }
     } else {
@@ -67,9 +72,9 @@ const App = () => {
           })
           setTimeout(() => setMessage(null), 5000)
         })
-        .catch(() => {
+        .catch((error) => {
           setMessage({
-            text: `Could not add ${newName}`,
+            text: error.response?.data?.error || `Could not add ${newName}`,
             type: 'error'
           })
           setTimeout(() => setMessage(null), 5000)
